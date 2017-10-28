@@ -1,0 +1,431 @@
+
+                            ÜÛÛÛÛÛÛÜ     ÜÛÛß ÜÛÛÛÛÛÛÜ
+                            ÛÛÛ  ÛÛÛ   ÜÛÛß   ÛÛÛ  ÛÛÛ
+                            ÛÛÛÜÜÜÜ  ÜÛÛß ÜÜÜ ßÛÛÜÜÛÛß
+                             ßßßßÛÛÛ ÛÛÛÜÜÛÛÛ ÜÛÛßßÛÛÜ
+                            ÛÛÛ  ÛÛÛ ßßßßßÛÛÛ ÛÛÛ  ÛÛÛ
+                            ßÛÛÛÛÛÛß      ÛÛÛ ßÛÛÛÛÛÛß
+
+
+           A Full Screen Simulator for 8048 Compatible Microprocessors
+                                   Version 1.3
+
+                                  William Luitje
+                                   23 July 1996 
+
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Background ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        I  wrote this simulator as part of my work on a consulting job  a 
+        few years ago.   There is still quite a lot of work one could  do 
+        to improve it, such as providing a way to manually change RAM and 
+        ports,   allowing  disassembly of any part  of  ROM,   simulating 
+        changes in inputs,  command files...  A LOT!  Still, I think it's 
+        useful,   as  is,   for learning the 8048   instruction  set  and 
+        debugging small programs.   I hope it's useful to you; if you use 
+        it,   please  see  the registration section at the  end  of  this 
+        document (relax, no money is involved). 
+
+        With  the  work I mentioned above and some features  specifically 
+        for  an educational environment,  this program would make a great 
+        tool   for  teaching  microprocessor  programming.     Commercial 
+        programs like this cost from US$200 to $300.  If I make an educa-
+        tional version of S48,  I  envision a site licensing  arrangement 
+        which would cost a very modest amount per student.  If you are an 
+        instructor or administrator and are interested in pursuing  this, 
+        contact  me at the address given at the end of this document even 
+        if you use a different micro in your course. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Introduction ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        S48   simulates the instruction set and some of the hardware  for 
+        the 8048,  8049,  8050, 8021, 8022  microprocessors originated by 
+        Intel and now widely second-sourced.  The simulator handles these 
+        hardware parameters: 
+
+        ş 4096 bytes of ROM
+        ş 128 bytes of internal RAM
+        ş 256 bytes of external RAM
+        ş 7 I/O ports
+        ş one 8 bit timer
+
+        The  hardware  registers  and  flags  and  RAM  are  continuously 
+        displayed  on  screen  and  are updated as  each  instruction  is 
+        executed.  There is a disassembly window showing the instructions 
+        as they are executed.   You can trace through instructions one at 
+        a time or execute them continuously until a breakpoint is reached 
+        or you stop the program manually. 
+        
+        The  hardware requirements to run S48  are quite simple;   you'll 
+        need  a  PC  with a monochrome,  Hercules,  CGA,   EGA,   or  VGA 
+        compatible  video card (the program does direct screen writes  so 
+        you'll  see snow using CGA).   A  color display is  not  strictly 
+        necessary, but is certainly helpful in reading the screen easily.  
+        Obviously,  the faster your CPU,  the faster the simulation  will 
+        run.  A 4.77 MHz PC is adequate for small programs.  The software 
+        requirements  are even simpler:  you'll need some version of DOS, 
+        S48 and an 8048 program to simulate.  
+         
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Sample Program ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        I've included a very simple sample program for you to play  with, 
+        called demo.bin.  demo.asm is the source file and implements a 16 
+        bit  counter in software.   There is an interrupt service routine 
+        which  captures  the low byte of that counter and  stores  it  in 
+        consecutive  locations  in  external RAM when  the  interrupt  is 
+        invoked.  The timer interrupt service routine increments an 8 bit 
+        counter  when the timer overflows.  It's short enough that I  can 
+        reproduce  its  assembly listing here: 
+
+                                     .org   0
+           0000 00                   nop    
+           0001 04 09                jmp    start
+           0003                      .org   3
+           0003 00                   nop
+           0004 00                   nop
+           0005 04 1B                jmp    intsvc
+           0007                      .org   7
+           0007 04 21                jmp    tmrsvc
+           0009             ; Initialization
+           0009 27          start    clr    a
+           000A A8                   mov    r0,a
+           000B A9                   mov    r1,a
+           000C AB                   mov    r3,a
+           000D 62                   mov    t,a
+           000E B8 18                mov    r0,#24
+           0010 A0                   mov    @r0,a
+           0011 25                   en     tcnti
+           0012 55                   strt   t
+           0013 05                   en     i
+           0014             ; Main Loop
+           0014 18          loop     inc    r0
+           0015 F8                   mov    a,r0
+           0016 96 14                jnz    loop
+           0018 19                   inc    r1
+           0019 04 14                jmp    loop
+           001B             ; External Interrupt Service Routine
+           001B F8          intsvc   mov    a,r0
+           001C D5                   sel    rb1
+           001D 90                   movx   @r0,a
+           001E 18                   inc    r0
+           001F C5                   sel    rb0
+           0020 93                   retr
+           0021             ; Timer Overflow Interrupt Service Routine
+           0021 1B          tmrsvc   inc    r3
+           0022 93                   retr
+           0023                      .end
+
+        You'll also need an understanding of the 8048 instruction set and 
+        architecture.  You won't find much help in this document. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Tutorial ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        The 8048 program to be executed can be in either Intel hex format 
+        or binary, like you would use to program an EPROM.  The simulator 
+        tries  to  read  the file in hex format first and if  that  fails 
+        assumes that the file is binary.   To invoke the simulator,  just 
+        give the name of the program file as an argument, e.g.: 
+
+        s48 demo.bin 
+
+        Take  a  minute to familiarize yourself with the  layout  of  the 
+        screen: 
+
+ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+ ³Cmd:                                                                        ³
+ ³ 35 bytes read from demo.bin                                                ³
+ ³ÚÄPC¿ ÚAÄ¿ÚPSWÂCYÂACÂF0ÂF1ÂRBÂSTK¿TIEÂTSÂTFÂTM¿                             ³
+ ³À000Ù À  ÙÀÄ08ÁÄ ÁÄ ÁÄ0ÁÄ0ÁÄ0ÁÄÄ0ÙÀÄ0ÁÄ0Á00Á  Ù                             ³
+ ³ ÚMB¿ ÚBus¿ÚP1ÂP2ÂP3ÂP4ÂP5ÂP6ÂP7¿ ÚT0ÂT1ÂIIÂIE¿                             ³
+ ³ ÀÄ0Ù ÀÄ  ÙÀ  Á  Á  Á  Á  Á  Á  Ù ÀÄ ÁÄ ÁÄ ÁÄ Ù                             ³
+ ³    ÉÍ00ÍÍ10ÍÍ20ÍÍ30ÍÍ40ÍÍ50ÍÍ60ÍÍ70ÍÍÍ»          ±000±00±±±±NOP±±±±±±±     ³
+ ³ 00 º °°                               º 08        001 04 06 JMP  006       ³
+ ³ 01 º °°                               º 09        003 00    NOP            ³
+ ³ 02 º °°                               º 0A        004 00    NOP            ³
+ ³ 03 º °°                               º 0B        006 04 1B JMP  01B       ³
+ ³ 04 º °°                               º 0C        007 04 21 JMP  021       ³
+ ³ 05 º °°                               º 0D        ÚÄÄÄÄBreakpointsÄÄÄÄ¿    ³
+ ³ 06 º °°                               º 0E        À±±± ±±± ±±± ±±± ±±±Ù    ³
+ ³ 07 º °°                               ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»    ³
+ ³    ÌÍ00ÍÍ10ÍÍ20ÍÍ30ÍÍ40ÍÍ50ÍÍ60ÍÍ70ÍÍ80ÍÍ90ÍÍA0ÍÍB0ÍÍC0ÍÍD0ÍÍE0ÍÍF0ÍÍÍ¹    ³
+ ³ 00 º                                                                  º  08³
+ ³ 01 º                                                                  º  09³
+ ³ 02 º                                                                  º  0A³
+ ³ 03 º                                                                  º  0B³
+ ³ 04 º                                                                  º  0C³
+ ³ 05 º                                                                  º  0D³
+ ³ 06 º                                                                  º  0E³
+ ³ 07 º                                                                  º  0F³
+ ³    ÈÍÍÍ0FÍÍ1FÍÍ2FÍÍ3FÍÍ4FÍÍ5FÍÍ6FÍÍ7FÍÍ8FÍÍ9FÍÍAFÍÍBFÍÍCFÍÍDFÍÍEFÍÍFFÍ¼    ³
+ ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        The  top  line is where you type your commands to the  simulator.  
+        The  second  line is where any messages from S48  are  displayed.  
+        The hardware registers and flags are displayed with a light  blue 
+        background  at  the  top  left  of  the  screen.    There  is  an 
+        instruction disassembly window at the top right with the  current 
+        instruction (the one to be executed next) shown in reverse video.  
+        Below   it   are  the  5  instructions  following   the   current 
+        instruction.    Above  it will be displayed the 6  most  recently 
+        executed instructions.  Below the disassembly window is where the 
+        breakpoints are displayed. 
+              
+        The large L shaped box shows all of RAM.   The top part shows 128 
+        bytes of internal RAM and the lower shows 256  bytes of  external 
+        RAM.   There isn't enough room on the screen to have blank  space 
+        between  the columns so they are distinguished by the  background 
+        color.   The first column contains locations 00  through 07;  the 
+        second holds 08 through 0F, and so on.  The light blue background 
+        in internal RAM shows the active register bank. 
+
+        When  the  simulator is started the processor is in  reset.   The 
+        values  of registers which are initialized by RESET,  e.g.    the 
+        Program Counter,  are shown;  registers which are undefined after 
+        RESET, such as the Accumulator and RAM are shown as blank. 
+
+        Let's do some simulation.  Give a Trace command by pressing the t 
+        key  and  return  (or  more  simply,   just  return).    The  NOP 
+        instruction has now moved above the current instruction line, the 
+        PC  has  changed to 001  and the current instruction is JMP  006.  
+        Give another trace command and the current instruction changes to 
+        CLR   A.    Notice  that  the  instructions  after  the   current 
+        instruction  have now changed to reflect the jump.   Their  color 
+        has  changed,   too,  to make it easier to see that the jump  was 
+        taken.    (This  is especially useful for  following  conditional 
+        jumps.)     Trace  again  and  notice  how  the  Accumulator   is 
+        initialized to zero. 
+        
+        Now  let's  watch the simulation run for a while.   Give  the  Go 
+        command  by  pressing the g key and return.   As  the  simulation 
+        runs, notice how the timer register changes and memory location 0 
+        counts up quickly and memory location 1 counts slowly.  Press any 
+        key to stop the simulation. 
+
+        To invoke the interrupt, press the i key and return.   Notice how 
+        the  current instruction changes to the first instruction of  the 
+        interrupt  service routine at location 003.   Trace  through  the 
+        rest  of  the  interrupt  service  routine  and  notice  how  the 
+        background  of the register banks changes as the active  register 
+        bank is switched. 
+
+        To  demonstrate setting a breakpoint,  type "b 18"   and  return.  
+        This  will  set a breakpoint at the instruction which  increments 
+        the high byte of the 16 bit counter. Now give a go command and in 
+        a few seconds the simulation will stop at location 18.  To remove 
+        the  breakpoint,   use the kill command with the address  of  the 
+        breakpoint you want to remove.   In this case, "k 18"  and return 
+        will do the trick. 
+
+        To Quit the simulator, press q and return. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Command Summary ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        You've  seen all of the commands except for Help,  Reset and Port 
+        in the tutorial; here we'll summarize them and give a little more 
+        information about them.   Only the first letter of the command is 
+        parsed  and  it can be either upper or lower case.   Some of  the 
+        commands can take a numeric argument which is always expressed in 
+        hexadecimal and need not be given in some cases. 
+
+        g #   Go: Start simulating at address #.  Simulation stops when a 
+              breakpoint  is reached or when a key is pressed.   If #  is 
+              not given,  simulation starts at the current instruction.
+
+        t #   Trace:  Trace  #  instructions.   If # is not  given,   one 
+              instruction is traced.
+
+        <ret> Trace one instruction; equivalent to "t 1".
+
+        b #   Breakpoint:  Set  a breakpoint at the given address.    The 
+              command has no effect if a number is not given. 
+
+        k #   Kill  breakpoint:   Remove  the  breakpoint  at  the  given 
+              address.    The  command has no effect if a number  is  not 
+              given or if there is no breakpoint at that address. 
+
+        p # # Port value:  Set the port  specified by the first # to  the 
+              value  specified by the second #.   Two parameters must  be 
+              given. 
+
+        r     Reset:  Simulate a  reset.   The Program Counter is set  to 
+              zero and other registers are set as appropriate.  Registers 
+              which are not affected by RESET are not changed. 
+
+        i     Interrupt:  Simulate  an external interrupt.   The  Program 
+              Counter  is  set to the location of the  interrupt  service 
+              routine, 0003H, and further interrupts are disabled. 
+
+        q     Quit:  Quit the simulation.  Come back again soon!
+
+        h     or  any  unrecognized  command  will  display  a small help 
+              screen listing the available commands and their syntax. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Timer Simulation ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        The boxes which display the state of the timer are located in the 
+        top  row of registers at the extreme right of the register  area.  
+        They are explained as follows: 
+
+        TIE - the Timer Interrupt Enable bit.  This is set by an EN TCNTI 
+        instruction and cleared by DIS TCNTI. 
+
+        TS - the Timer Started bit. This is set by the STRT T and cleared 
+        by the STOP TCNT instructions. 
+
+        TF - contains two bits related to timer overflow.   The right one 
+        is  the  Timer  Flag  which is tested  and  cleared  by  the  JTF 
+        instruction.   The left one is the Timer Overflow Flipflop  which 
+        is  set  when the timer overflows and the Timer Interrupt  Enable 
+        bit is set.  It is cleared when the timer interrupt is invoked so 
+        you  won't see this bit set unless the external interrupt  is  in 
+        progress when the timer overflows. 
+
+        TM - the  timer register itself.   It  is  updated after each in-
+        struction is simulated.  The state of the prescaler is not shown. 
+
+        The  counter is not simulated at this time since there is no  way 
+        to simulate changes in external inputs. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Screen Colors ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        If you don't have a color monitor or simply don't like all of the 
+        colors  but have a color capable display adapter,  you can  force 
+        S48 to display in monochrome by using the DOS MODE command to set 
+        the   default  display  mode  to  either  BW80   or  MONO.    S48 
+        automatically detects MDA and Hercules display adapters. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Distribution ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        The S48 package consists of the following files:
+
+          ş s48.exe
+          ş s48.doc
+          ş demo.asm
+          ş demo.bin
+          ş also_by.wvl
+        
+        This package and the individual files in it are copyrighted works 
+        of William Luitje.  The author grants you a non-exclusive license 
+        to   copy  and  distribute  these  works  as  long  as  they  are 
+        distributed as a group and are not modified in any way  including 
+        the deletion of any files or addition of other files (such as BBS 
+        ads) in the distribution archive. 
+
+        On a related note,  I am distributing this package for free.   If 
+        you paid money for a floppy or CD-ROM with this package on it, be 
+        aware that I am not seeing a penny of it.   What you paid for  is 
+        the  service of distribution.   I'm sure that you understand  the 
+        nature of transactions like that but I have heard from people who 
+        "bought  one  of  my  programs"   and  expect  me  to  conduct  a 
+        correspondence  course on basic PC techniques,  theory and repair 
+        because  of  their  "purchase".   While I am always open  to  bug 
+        reports  and  well  thought out questions  and  suggestions  (and 
+        postcards!),   please read the documentation carefully and  check 
+        with local experts before you fire up your word processor. 
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Registration ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        While this software may be freely copied and used,  I  do request 
+        that  you  register  it if you use it.   Just send  me  either  a 
+        postcard   or   some  e-mail  telling  which  program   you   are 
+        registering.   I'd prefer a local,  picture postcard;  after all, 
+        whether  it's great or whether it's a pit,  the place  where  you 
+        live is probably interesting in some way, right? 
+          
+        This is only partially an ego massage for the author.   I   enjoy 
+        writing  useful  utilities  and  have  several  other  pieces  of 
+        freeware  out  floating  around  the  net  (see  ALSO_BY.WVL  for 
+        details).    I'd  like  feedback about which  of  them  is  worth 
+        expanding and supporting.   Postware really works!  I support the 
+        programs  which  are  most  used.   I'm not  planning  on  adding 
+        features to this program, but I might if I get enough postcards!  
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± Conditions of Use ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        The program has not been tested against a real live 8048  because 
+        I  don't  have  access to an 8048  hardware  development  system.  
+        That's why I wrote this simulator in the first place!   The Intel 
+        data  books  I  used were ambiguous in places so I  made  guesses 
+        about  how  some of the subtler points of the  simulation  should 
+        work.    E.g.,  does INC set AC?   Until one of my correspondents 
+        wrote some test software and ran it on real silicon, I could only 
+        guess that it did not.   That turned out to be correct but  there 
+        may be instances where I guessed wrong.  Bug reports are welcome, 
+        especially  when  you  can provide documentation  about  how  the 
+        simulation really should work. 
+
+        So, keep in mind that this software is provided as is.  I make no 
+        guarantees about it except that it will take up space on any disk 
+        you place it on.  Further, any software you write with the aid of 
+        this simulator is your responsibility.   Verify that it  operates 
+        properly  with  actual  hardware before you use it  in  the  real 
+        world. 
+
+        William Luitje
+        2677 Wayside Drive
+        Ann Arbor, MI 48103
+        USA
+
+        My  e-mail address is somewhat unstable at the current  time  and 
+        one  or both of the following addresses may disappear.   Try  the 
+        first  address  and if that doesn't work,  try the  second.    If 
+        neither works, try looking for "William Luitje"  (I think I'm the 
+        only  one  in  the world!)   on one of  the  WWW  e-mail  address 
+        databases, such as www.four11.com or www.whowhere.com.  I plan to 
+        stay connected so be persistent and you'll get through to me! 
+
+        luitje@m-net.arbornet.org
+        luitje@cyberspace.org
+
+       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³±±± History ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+        Version 1.0  1 Aug 94 
+          Initial public release
+
+        Version 1.1 11 Feb 95 
+          Added command to set ports
+          Added color change of prospective disassembly window after jump,
+            branch or interrupt. 
+
+        Version 1.2  24 Nov 95
+          Added automatic detection and support for MDA/Hercules video cards
+          Added <ret> as a synonym for T 1
+          Rewrote user input routine to set background color, handle long 
+            lines and ESC correctly
+          Added ability to read Intel format hex files (Rainer Glaschick 
+            supplied the code for this)
+          Fixed several emulation bugs (thanks to Rainer Glaschick, 
+            Leonhard Schneider, Gabriel Patulea and Mike Loving for 
+            their reports)
+
+        Version 1.3 23 Jul 96
+          Added timer emulation
+          Added a small on-line help screen
+          Increased speed of emulation by 70%
+          Fixed an emulation bug (thanks to Motti Grinberg for the 
+            report)
+
+        Copyright 1994-1996 by William Luitje
+

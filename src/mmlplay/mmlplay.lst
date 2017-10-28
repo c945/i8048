@@ -1,0 +1,403 @@
+ AS V1.42 Beta [Bld 32] - source file mmlplay.asm - page 1 - 10/23/2017 20:11:33
+
+
+       1/       0 :                     ;$Id: mmlplay.asm,v 1.13 2004/11/29 05:15:28 runner Exp $
+       2/       0 :                     
+       3/       0 :                     ;mmlplayer
+       4/       0 :                     ;	mmlsyntax
+       5/       0 :                     ;		'[{<>}]{cdefgabr}[{+}{1248}][.]'
+       6/       0 :                     ;	<:octave down,continue default 0 octave in 0 1 2
+       7/       0 :                     ;	>:octave up, continue
+       8/       0 :                     ;	CDEFGAG:oto data
+       9/       0 :                     ;	+:#
+      10/       0 :                     ;	/:Repeat
+      11/       0 :                     ;	01248:otono nagasa default=4
+      12/       0 :                     ;	.:futen
+      13/       0 :                     ;
+      14/       0 :                     ;	P1[0-7] - LED -GND
+      15/       0 :                     ;	P25 - CrystalBuzzer - GND
+      16/       0 :                     ;	clock = 6MHz = 2.5us/MachieCycle
+      17/       0 :                     
+      18/       0 :                     	page	0
+      19/       0 :                     	cpu	8048
+      20/       0 :                     
+      21/       0 : =20H                _P25ON	equ	(1<<5)
+      22/       0 : =DFH                _P25OFF	equ	(0ffH ! _P25ON)
+      23/       0 :                     
+      24/       0 :                     	org	0
+      25/       0 : 23 FF               	mov	a,#0ffh
+      26/       2 :                     
+      27/       2 : BE 00               	mov	R6,#0			;R6:Octave(Default 0)
+      28/       4 : BF 00               	mov	R7,#0			;R7:mmldata pointer
+      29/       6 :                     loop:
+      30/       6 : BD 34               	mov	R5,#'4'			;R5:MML('0'-'9').default 4bu onpu
+      31/       8 : FF                  	mov	a,R7
+      32/       9 : 1F                  	inc	R7
+      33/       A : E3                  	movp3	a,@a			;get mml
+      34/       B : AC                  	mov	R4,a			;save mml
+      35/       C : D3 2F               	xrl	a,#'/'			;check '/' halt
+      36/       E : C6 59               	jz	hlt
+      37/      10 : FC                  	mov	a,R4
+      38/      11 : D3 3C               	xrl	a,#'<'			;check '<' Octave down.
+      39/      13 : 96 18               	jnz	L1
+      40/      15 :                     	;MML '<'
+      41/      15 : CE                  	dec	R6
+      42/      16 : 04 06               	jmp	loop
+      43/      18 : FC                  L1	mov	a,R4
+      44/      19 : D3 3E               	xrl	a,#'>'			;check '>' Octave Up.
+      45/      1B : 96 20               	jnz	L2
+      46/      1D :                     	;MML '>'
+      47/      1D : 1E                  	inc	R6
+      48/      1E : 04 06               	jmp	loop
+      49/      20 : FC                  L2	mov	a,R4
+      50/      21 : 34 39               	call	fixuptone		;convert MML to vector
+      51/      23 : AC                  	mov	R4,a			;R4:fixuped value
+      52/      24 : FF                  	mov	a,R7
+      53/      25 : E3                  	movp3	a,@a
+      54/      26 : D3 2B               	xrl	a,#'+'			;check '+'
+      55/      28 : 96 2C               	jnz	L3
+      56/      2A : 1C                  	inc	R4
+      57/      2B : 1F                  	inc	R7
+      58/      2C : FF                  L3	mov	a,R7
+      59/      2D : E3                  	movp3	a,@a
+      60/      2E : 03 D0               	add	a,#(256-'0')		;check < '0'
+      61/      30 : E6 3C               	jnc	L4
+      62/      32 : FF                  	mov	a,R7
+      63/      33 : E3                  	movp3	a,@a
+      64/      34 : 03 C6               	add	a,#(255-'9')		;check > '9'
+      65/      36 : F6 3C               	jc	L4
+      66/      38 :                     	;MML '0' - '9'
+      67/      38 : FF                  	mov	a,R7
+      68/      39 : E3                  	movp3	a,@a
+      69/      3A : AD                  	mov	R5,a			;R5:MML('0'-'9')
+      70/      3B : 1F                  	inc	R7
+      71/      3C : FF                  L4	mov	a,R7
+      72/      3D : E3                  	movp3	a,@a
+      73/      3E : D3 2E               	xrl	a,#'.'			;check '.'
+      74/      40 : 96 47               	jnz	L99
+      75/      42 :                     	;MML '.'
+      76/      42 : FD                  	mov	a,R5
+      77/      43 : 43 80               	orl	a,#80h
+      78/      45 : AD                  	mov	R5,a
+      79/      46 : 1F                  	inc	R7
+      80/      47 :                     L99:					;to play
+      81/      47 :                     ;display led start
+      82/      47 : FE                  	mov	a,R6
+      83/      48 : 47                  	swap	a
+      84/      49 : 53 F0               	anl	a,#0f0h
+      85/      4B : 4C                  	orl	a,R4
+      86/      4C : 37                  	cpl	a
+      87/      4D : 39                  	outl	P1,a			;P1:LED display MML
+      88/      4E :                     ;display led end
+      89/      4E : FD                  	mov	a,R5
+      90/      4F : 34 0E               	call	fixuplen
+      91/      51 : A9                  	mov	R1,a			;convert MML(length) to R1
+      92/      52 : FC                  	mov	a,R4			;convert MML(TONE) to value
+      93/      53 : 34 52               	call	gettone
+      94/      55 : 34 00               	call	play
+      95/      57 : 04 06               	jmp	loop
+      96/      59 :                     
+      97/      59 : 23 30               hlt:	mov	a,#'0'			;play "R0" and repeat
+      98/      5B : 34 0E               	call	fixuplen
+      99/      5D : A9                  	mov	R1,a
+     100/      5E : 23 00               	mov	a,#0
+     101/      60 : 39                  	outl	P1,a
+     102/      61 : 34 00               	call	play
+     103/      63 : 04 00               	jmp	0
+     104/      65 :                     
+     105/     100 :                     	org	($/256+1)*256
+     106/     100 :                     play:
+     107/     100 :                     	;play sound (R1-1)times play, 1times is mute.
+     108/     100 :                     	;@param	a	tone value for tone20ms or 0=mute.
+     109/     100 :                     	;@param	R1	repeat N(20ms)
+     110/     100 :                     	;@broken	R1
+     111/     100 : C9                  	dec	R1
+     112/     101 :                     play_loop
+     113/     101 : C6 07               	jz	play_mute
+     114/     103 : 34 96               	call	tone20ms
+     115/     105 : 24 09               	jmp	play_while
+     116/     107 :                     play_mute
+     117/     107 : 34 8C               	call	mute20ms
+     118/     109 :                     play_while
+     119/     109 : E9 01               	djnz	R1,play_loop
+     120/     10B : 34 8C               	call	mute20ms
+     121/     10D : 93                  	retr
+     122/     10E :                     
+     123/     10E :                     fixuplen:
+     124/     10E :                     	;convert MML length 
+     125/     10E :                     	;@param	a	'0' '1' '2' '4' '8' '9' < 80H < '0' '1' '2' '4' '8' '9'
+     126/     10E :                     	;@return=A	160 80  40  20  10  5           240 120  60  30  15   7
+     127/     10E :                     	;@broken	R0
+     128/     10E : A8                  	mov	R0,a
+     129/     10F : 53 80               	anl	a,#80h
+     130/     111 : 96 1B               	jnz	fixuplen2
+     131/     113 : F8                  	mov	a,R0
+     132/     114 : 03 D0               	add	a,#(256-'0')		;sub '0'
+     133/     116 : B8 25               	mov	R0,#(fixuplen_data & 0ffh)
+     134/     118 : 68                  	add	a,R0
+     135/     119 : A3                  	movp	a,@a
+     136/     11A : 93                  	retr
+     137/     11B :                     fixuplen2
+     138/     11B : F8                  	mov	a,R0
+     139/     11C : 53 7F               	anl	a,#7fh
+     140/     11E : 03 D0               	add	a,#(256-'0')		;sub '0'
+     141/     120 : B8 2F               	mov	R0,#(fixuplen2_data & 0ffh)
+     142/     122 : 68                  	add	a,R0
+     143/     123 : A3                  	movp	a,@a
+     144/     124 : 93                  	retr
+     145/     125 :                     
+     146/     125 :                     	;Normal Onpu
+     147/     125 :                     fixuplen_data:
+     148/     125 : A0                  	db	160	;0
+     149/     126 : 50                  	db	80	;1
+     150/     127 : 28                  	db	40	;2
+     151/     128 : 00                  	db	0
+     152/     129 : 14                  	db	20	;4
+     153/     12A : 00                  	db	0	
+     154/     12B : 00                  	db	0
+     155/     12C : 00                  	db	0
+     156/     12D : 0A                  	db	10	;8
+     157/     12E : 05                  	db	5	;9(16)
+     158/     12F :                     
+     159/     12F :                     	; Futen Onpu
+     160/     12F :                     fixuplen2_data:
+     161/     12F : F0                  	db	240	;0
+     162/     130 : 78                  	db	120	;1
+     163/     131 : 3C                  	db	60	;2
+     164/     132 : 00                  	db	0
+     165/     133 : 1E                  	db	30	;4
+     166/     134 : 00                  	db	0	
+     167/     135 : 00                  	db	0
+     168/     136 : 00                  	db	0
+     169/     137 : 0F                  	db	15	;8
+     170/     138 : 07                  	db	7	;9(16)
+     171/     139 :                     
+     172/     139 :                     fixuptone:
+     173/     139 :                     	;MML to vector number
+     174/     139 :                     	;@param	a	'c' 'd' 'e' 'f' 'g' 'a' 'b'    'r'
+     175/     139 :                     	;@return=A	 0   2   4   5   7   9   11     0
+     176/     139 :                     	;@broken	R0
+     177/     139 : 03 9F               	add	a,#(256-'a')		;sub 'A'
+     178/     13B : B8 40               	mov	R0,#(fixuptone_data & 0ffh)
+     179/     13D : 68                  	add	a,R0
+     180/     13E : A3                  	movp	a,@a
+     181/     13F : 93                  	retr
+     182/     140 :                     fixuptone_data:
+     183/     140 : 09                  	db	9	;a
+     184/     141 : 0B                  	db	11	;b
+     185/     142 : 00                  	db	0	;c
+     186/     143 : 02                  	db	2	;d
+     187/     144 : 04                  	db	4	;e
+     188/     145 : 05                  	db	5	;f
+     189/     146 : 07                  	db	7	;g
+     190/     147 : FF                  	db	255	;h
+     191/     148 : FF                  	db	255	;i
+     192/     149 : FF                  	db	255	;j
+     193/     14A : FF                  	db	255	;k
+     194/     14B : FF                  	db	255	;l
+     195/     14C : FF                  	db	255	;m
+     196/     14D : FF                  	db	255	;n
+     197/     14E : FF                  	db	255	;o
+     198/     14F : FF                  	db	255	;p
+     199/     150 : FF                  	db	255	;q
+     200/     151 : FF                  	db	255	;r
+     201/     152 :                     
+     202/     152 :                     gettone:
+     203/     152 :                     	;get tone value for tone20ms
+     204/     152 :                     	;param	a	0=C(do) 1=C#(do#) 2=D(re) 3=D#(re#) 4=E(mi) ...255=mute
+     205/     152 :                     	;param	R6	octave 0 or 1 or 2
+     206/     152 :                     	;return	a	TONE VALLUE(mute=0)
+     207/     152 :                     	;broken	R0
+     208/     152 : 17                  	inc	a
+     209/     153 : C6 67               	jz	gettone_end
+     210/     155 : 07                  	dec	a
+     211/     156 : 2E                  	xch	a,R6
+     212/     157 : A8                  	mov	R0,a
+     213/     158 : 2E                  	xch	a,R6	;R0=Octave
+     214/     159 : 17                  	inc	a
+     215/     15A : 17                  	inc	a
+     216/     15B : 17                  	inc	a	;skip from beepvalue.dat A,A#,B
+     217/     15C : 18                  	inc	R0
+     218/     15D : 24 61               	jmp	$+4
+     219/     15F : 03 0C               	add	a,#12
+     220/     161 : E8 5F               	djnz	R0,$-2
+     221/     163 : B8 68               	mov	R0,#(gettone_value & 0ffh);
+     222/     165 : 68                  	add	a,R0
+     223/     166 : A3                  	movp	a,@a
+     224/     167 :                     gettone_end
+     225/     167 : 93                  	retr
+     226/     168 :                     gettone_value:
+     227/     168 : E1                  	db 225	;A  440.00Hz t=2272.73us val=224.77 
+     228/     169 : D4                  	db 212	;A# 466.16Hz t=2145.17us val=212.02 
+     229/     16A : C8                  	db 200	;B  493.88Hz t=2024.77us val=199.98 
+     230/     16B : BD                  	db 189	;C  523.25Hz t=1911.13us val=188.61 
+     231/     16C : B2                  	db 178	;C# 554.37Hz t=1803.86us val=177.89 
+     232/     16D : A8                  	db 168	;D  587.33Hz t=1702.62us val=167.76 
+     233/     16E : 9E                  	db 158	;D# 622.25Hz t=1607.06us val=158.21 
+     234/     16F : 95                  	db 149	;E  659.26Hz t=1516.86us val=149.19 
+     235/     170 : 8D                  	db 141	;F  698.46Hz t=1431.73us val=140.67 
+     236/     171 : 85                  	db 133	;F# 739.99Hz t=1351.37us val=132.64 
+     237/     172 : 7D                  	db 125	;G  783.99Hz t=1275.53us val=125.05 
+     238/     173 : 76                  	db 118	;G# 830.61Hz t=1203.94us val=117.89 
+     239/     174 : 6F                  	db 111	;A  880.00Hz t=1136.36us val=111.14 
+     240/     175 : 69                  	db 105	;A# 932.33Hz t=1072.58us val=104.76 
+     241/     176 : 63                  	db 99	;B  987.77Hz t=1012.38us val=98.74 
+     242/     177 : 5D                  	db 93	;C  1046.50Hz t=955.56us val=93.06 
+     243/     178 : 58                  	db 88	;C# 1108.73Hz t=901.93us val=87.69 
+     244/     179 : 53                  	db 83	;D  1174.66Hz t=851.31us val=82.63 
+     245/     17A : 4E                  	db 78	;D# 1244.51Hz t=803.53us val=77.85 
+     246/     17B : 49                  	db 73	;E  1318.51Hz t=758.43us val=73.34 
+     247/     17C : 45                  	db 69	;F  1396.91Hz t=715.86us val=69.09 
+     248/     17D : 41                  	db 65	;F# 1479.98Hz t=675.69us val=65.07 
+     249/     17E : 3D                  	db 61	;G  1567.98Hz t=637.76us val=61.28 
+     250/     17F : 3A                  	db 58	;G# 1661.22Hz t=601.97us val=57.70 
+     251/     180 : 36                  	db 54	;A  1760.00Hz t=568.18us val=54.32 
+     252/     181 : 33                  	db 51	;A# 1864.66Hz t=536.29us val=51.13 
+     253/     182 : 30                  	db 48	;B  1975.53Hz t=506.19us val=48.12 
+     254/     183 : 2D                  	db 45	;C  2093.00Hz t=477.78us val=45.28 
+     255/     184 : 2B                  	db 43	;C# 2217.46Hz t=450.97us val=42.60 
+     256/     185 : 28                  	db 40	;D  2349.32Hz t=425.66us val=40.07 
+     257/     186 : 26                  	db 38	;D# 2489.02Hz t=401.77us val=37.68 
+     258/     187 : 23                  	db 35	;E  2637.02Hz t=379.22us val=35.42 
+     259/     188 : 21                  	db 33	;F  2793.83Hz t=357.93us val=33.29 
+     260/     189 : 1F                  	db 31	;F# 2959.96Hz t=337.84us val=31.28 
+     261/     18A : 1D                  	db 29	;G  3135.96Hz t=318.88us val=29.39 
+     262/     18B : 1C                  	db 28	;G# 3322.44Hz t=300.98us val=27.60 
+     263/     18C :                     
+     264/     18C :                     mute20ms:
+     265/     18C :                     	;mute 20ms
+     266/     18C :                     	;@param		none
+     267/     18C :                     	;@broken	R0,TIMER
+     268/     18C : 28                  	xch	a,R0
+     269/     18D : 27                  	clr	a
+     270/     18E : 62                  	mov	T,a
+     271/     18F : 55                  	strt	t
+     272/     190 :                     mute20ms_loop
+     273/     190 : 16 94               	jtf	mute20ms_end
+     274/     192 : 24 90               	jmp	mute20ms_loop
+     275/     194 :                     mute20ms_end
+     276/     194 : 65                  	stop	tcnt
+     277/     195 : 93                  	retr
+     278/     196 :                     	
+     279/     196 :                     tone20ms:
+     280/     196 :                     	;BEEP to P25 while 20ms
+     281/     196 :                     	;@param		a:tone control 25+10N (us)
+     282/     196 :                     	;@broken	R0,TIMER
+     283/     196 : 28                  	xch	a,R0
+     284/     197 : 27                  	clr	a
+     285/     198 : 62                  	mov	T,a
+     286/     199 : 55                  	strt	t
+     287/     19A : 28                  	xch	a,R0
+     288/     19B :                     tone20ms_loop:			;5+2*(N-1)+5+2*(N-1)+4 Machine Cycle.
+     289/     19B : 8A 20               	orl	P2,#_P25ON	;=14+4*(N-1) = 10+4N = 25+10N(us)
+     290/     19D : A8                  	mov	R0,a		;Ex. 440Hz = 2273us = (2273-25)/10N ... N=225
+     291/     19E : E8 9E               	djnz	R0,$
+     292/     1A0 : 9A DF               	anl	P2,#_P25OFF
+     293/     1A2 : A8                  	mov	R0,a
+     294/     1A3 : E8 A3               	djnz	R0,$
+     295/     1A5 : 16 A9               	jtf	tone20ms_end
+     296/     1A7 : 24 9B               	jmp	tone20ms_loop
+     297/     1A9 :                     tone20ms_end
+     298/     1A9 : 65                  	stop	tcnt
+     299/     1AA : 93                  	retr
+     300/     1AB :                     
+     301/     300 :                     	org	0300h		;8048 Page 3
+     302/     300 :                     mmldata:
+     303/     300 :                     
+     304/     300 :                     	;EIGA KINJIRARETA ASOBI
+     305/     300 : 61 61 61 61 67 66   	db "aaaagffeddfa>ddddc<a+a+aggaa+aa+a>c+<a+aagffedeeeefed1"
+                    66 65 64 64 66 61 
+                    3E 64 64 64 64 63 
+                    3C 61 2B 61 2B 61 
+                    67 67 61 61 2B 61 
+                    61 2B 61 3E 63 2B 
+                    3C 61 2B 61 61 67 
+                    66 66 65 64 65 65 
+                    65 65 66 65 64 31 
+     306/     336 : 61 61 61 61 67 66   	db "aaaagffeddfa>ddddc<a+a+aggaa+aa+a>c+<a+aagffedeeeefed1"
+                    66 65 64 64 66 61 
+                    3E 64 64 64 64 63 
+                    3C 61 2B 61 2B 61 
+                    67 67 61 61 2B 61 
+                    61 2B 61 3E 63 2B 
+                    3C 61 2B 61 61 67 
+                    66 66 65 64 65 65 
+                    65 65 66 65 64 31 
+     307/     36C : 66 2B 66 2B 66 2B   	db "f+f+f+f+eddc+c+c+cc+bbbb>c+<bbaaab>c+ddddc+c<bbbbagf+f+f+f+ged1"
+                    66 2B 65 64 64 63 
+                    2B 63 2B 63 2B 63 
+                    63 2B 62 62 62 62 
+                    3E 63 2B 3C 62 62 
+                    61 61 61 62 3E 63 
+                    2B 64 64 64 64 63 
+                    2B 63 3C 62 62 62 
+                    62 61 67 66 2B 66 
+                    2B 66 2B 66 2B 67 
+                    65 64 31 
+     308/     3AB : 61 61 61 61 67 66   	db "aaaagffeddfa>ddddc<a+a+aggaa+aa+a>c+<a+aagffedeeeefed0"
+                    66 65 64 64 66 61 
+                    3E 64 64 64 64 63 
+                    3C 61 2B 61 2B 61 
+                    67 67 61 61 2B 61 
+                    61 2B 61 3E 63 2B 
+                    3C 61 2B 61 61 67 
+                    66 66 65 64 65 65 
+                    65 65 66 65 64 30 
+     309/     3E1 : 72 30               	db "r0"
+     310/     3E3 : 2F                  	db "/"
+     311/     3E4 :                     
+     312/     3E4 :                     	end
+ AS V1.42 Beta [Bld 32] - source file mmlplay.asm - page 2 - 10/23/2017 20:11:33
+
+
+  symbol table (* = unused):
+  ------------------------
+
+*ARCHITECTURE : i386-unknown-freebsd - |
+*BIGENDIAN :                      0 - | *BRANCHEXT :                      0 - |
+*CASESENSITIVE :                  0 - | *CONSTPI :        3.141592653589793 - |
+*DATE :                  10/23/2017 - | *FALSE :                          0 - |
+ FIXUPLEN :                     10E C |  FIXUPLEN2 :                    11B C |
+ FIXUPLEN2_DATA :               12F C |  FIXUPLEN_DATA :                125 C |
+ FIXUPTONE :                    139 C |  FIXUPTONE_DATA :               140 C |
+*FULLPMMU :                       1 - |  GETTONE :                      152 C |
+ GETTONE_END :                  167 C |  GETTONE_VALUE :                168 C |
+*HAS64 :                          1 - | *HASDSP :                         0 - |
+*HASFPU :                         0 - | *HASPMMU :                        0 - |
+ HLT :                           59 C | *INEXTMODE :                      0 - |
+*INLWORDMODE :                    0 - | *INMAXMODE :                      0 - |
+*INSRCMODE :                      0 - | *INSUPMODE :                      0 - |
+ L1 :                            18 C |  L2 :                            20 C |
+ L3 :                            2C C |  L4 :                            3C C |
+ L99 :                           47 C | *LISTON :                         1 - |
+ LOOP :                           6 C | *MACEXP :                         1 - |
+*MMLDATA :                      300 C | *MOMCPU :                      8048 - |
+*MOMCPUNAME :                  8048 - |  MUTE20MS :                     18C C |
+ MUTE20MS_END :                 194 C |  MUTE20MS_LOOP :                190 C |
+*NESTMAX :                      100 - | *PACKING :                        0 - |
+*PADDING :                        1 - |  PLAY :                         100 C |
+ PLAY_LOOP :                    101 C |  PLAY_MUTE :                    107 C |
+ PLAY_WHILE :                   109 C | *RELAXED :                        0 - |
+*TIME :                    20:11:33 - |  TONE20MS :                     196 C |
+ TONE20MS_END :                 1A9 C |  TONE20MS_LOOP :                19B C |
+*TRUE :                           1 - | *VERSION :                     142F - |
+ _P25OFF :                       DF - |  _P25ON :                        20 - |
+
+     57 symbols
+     29 unused symbols
+
+ AS V1.42 Beta [Bld 32] - source file mmlplay.asm - page 3 - 10/23/2017 20:11:33
+
+
+  codepages:
+  ----------
+
+STANDARD (0 changed characters)
+
+
+0.13 seconds assembly time
+
+    314 lines source file
+      2 passes
+      0 errors
+      0 warnings
